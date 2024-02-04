@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: etcd
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - args:
+    - /usr/local/bin/etcd 
+    - --config-file=/etc/etcd/etcd.config.yml
+  
+    image: ${etcdImage}
+    imagePullPolicy: IfNotPresent
+    name: etcd
+    resources:
+      requests:
+        cpu: 250m
+    securityContext:
+      privileged: false
+    volumeMounts:
+    - mountPath: /etc/etcd
+      name: conf
+    - mountPath: /var/lib/etcd
+      name: data     
+    - mountPath: /etc/kubernetes/pki/etcd
+      name: pki
+
+
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/etcd
+      type: DirectoryOrCreate
+    name: conf 
+  - hostPath:
+      path: /var/lib/etcd
+      type: DirectoryOrCreate
+    name: data
+  - hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: DirectoryOrCreate
+    name: pki

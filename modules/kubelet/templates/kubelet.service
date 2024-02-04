@@ -1,0 +1,23 @@
+[Unit]
+Description=Kubernetes Kubelet
+Documentation=https://github.com/kubernetes/kubernetes
+After={{ container.container }}.service
+Requires={{ container.container }}.service
+
+[Service]
+ExecStart=/usr/local/bin/kubelet \
+  --bootstrap-kubeconfig=/etc/kubernetes/bootstrap.kubeconfig \
+  --kubeconfig=/etc/kubernetes/kubelet.kubeconfig \
+  --root-dir=${kubelet.rootdir} \
+  --config=/etc/kubernetes/kubelet-conf.yml \
+  --node-ip=${bind} \
+  --hostname-override=${hostname} \
+  --cert-dir=/etc/kubernetes/pki \
+  --container-runtime-endpoint=${runtime} \
+  --v=${kubelet.logLevel}
+
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

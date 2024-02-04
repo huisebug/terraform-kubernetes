@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: kube-controller-manager
+  name: kube-controller-manager
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - /usr/local/bin/kube-controller-manager 
+    - --allocate-node-cidrs=true 
+    - --authentication-kubeconfig=/etc/kubernetes/controller-manager.kubeconfig 
+    - --authorization-kubeconfig=/etc/kubernetes/controller-manager.kubeconfig 
+    - --bind-address=0.0.0.0 
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt 
+    - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt 
+    - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key 
+    - --kubeconfig=/etc/kubernetes/controller-manager.kubeconfig 
+    - --leader-elect=true 
+    - --leader-elect-lease-duration=60s 
+    - --leader-elect-renew-deadline=40s 
+    - --leader-elect-retry-period=10s 
+    - --cluster-cidr=${cluster-cidr}
+    - --service-cluster-ip-range=${service-cluster-ip-range}
+    - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt 
+    - --service-account-private-key-file=/etc/kubernetes/pki/sa.key 
+    - --root-ca-file=/etc/kubernetes/pki/ca.crt 
+    - --use-service-account-credentials=true 
+    - --controllers=*,bootstrapsigner,tokencleaner 
+    - --cluster-signing-duration=86700h 
+    - --horizontal-pod-autoscaler-sync-period=30s 
+    - --horizontal-pod-autoscaler-downscale-stabilization=3m0s 
+    - --node-monitor-period=6s 
+    - --node-monitor-grace-period=2m 
+    - --v=2
+    image: ${KubernetesImage}
+    imagePullPolicy: IfNotPresent
+    name: kube-controller-manager
+    resources:
+      requests:
+        cpu: 250m
+    securityContext:
+      privileged: false
+    volumeMounts:
+    - mountPath: /etc/kubernetes
+      name: conf
+ 
+  hostNetwork: true
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes
+      type: DirectoryOrCreate
+    name: conf
