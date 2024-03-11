@@ -1,0 +1,152 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+    version: v1
+  annotations:
+    hpa.autoscaling.banzaicloud.io/minReplicas: "1"
+    hpa.autoscaling.banzaicloud.io/maxReplicas: "3"
+    cpu.hpa.autoscaling.banzaicloud.io/targetAverageUtilization: "70"    
+  name: nginx
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  replicas: 4
+  selector:
+    matchLabels:
+      app: nginx
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: nginx
+        version: v1
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - nginx
+              topologyKey: kubernetes.io/hostname    
+      initContainers:
+      - name: genhtml
+        image: nginx
+        command:
+        - bash 
+        - -c 
+        args:
+        - 'mkdir -p /tmp && touch /tmp/index.html && hostname > /tmp/index.html'
+        volumeMounts:
+        - name: html
+          mountPath: "/tmp"
+      containers:
+      - image: nginx
+        imagePullPolicy: IfNotPresent
+        name: nginx
+        env:
+        - name: IPAddr
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP       
+        - name: Nodename
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName  
+
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 5m
+            memory: "256Mi"
+          limits:
+            cpu: 30m
+            memory: "512Mi"
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: false
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "echo $IPAddr Hello from the postStart handler From node:$Nodename >> /usr/share/nginx/html/index.html"]          
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html  
+        stdin: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        tty: true
+    
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: html
+        emptyDir: {}
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx
+    version: v1
+  name: nginx
+
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: nginx
+    version: v1
+  # type: ClusterIP
+  type: NodePort
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: nginx.huisebug.org
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80
